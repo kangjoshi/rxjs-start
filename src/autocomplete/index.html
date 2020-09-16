@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Autocomplete</title>
+</head>
+<body>
+<div>
+  <input type="text" id="search" placeholder="검색하고 싶은 사용자 아이디를 입력하세요." />
+
+  <ul id="suggestLayer">
+
+  </ul>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/rxjs/6.6.3/rxjs.umd.min.js" integrity="sha512-JnZPWAckMDks0CCIeGznqEo7ifmYK7VowHq/NVFlSXGkwxv4OBCJFy7nouOtJZmVldHo7FQLIdeWTI55yyZc4Q==" crossorigin="anonymous"></script>
+<script>
+  const {fromEvent, Subject} = rxjs;
+  const {map, mergeAll, mergeMap, debounceTime, filter, distinctUntilChanged, tap, partition, switchMap, catchError, retry, finalize
+    , multicast, publish, refCount, share} = rxjs.operators;
+  const {ajax} = rxjs.ajax;
+
+  const layer = document.getElementById('suggestLayer')
+  function drawLayer(items) {
+    if (items) {
+      layer.innerHTML = items.map(user => {
+        return `<li><img src="${user.avatar_url}" width="75px">${user.login}</li>`
+      })
+    }
+  }
+
+  /*
+  * 데이터 처리
+  *   - 데이터 처리와 관련된 부분은 모두 Observable에서 처리한다.
+  *   - Observable을 하나의 독립된 데이터 소스로 취급함으로 Observer는 전달된 데이터만을 다룬다. (느슨한 의존성을 갖게 된다.)
+  *
+  * 평탄화
+  *   - Observable 안에 있는 여러개의 Observable을 꺼내서 하나의 Observable 형태로 만드는 것
+  *   - 오퍼레이터 mergeAll이 있다.
+  *
+  * 오퍼레이터
+  *   1. map()
+  *     - 기존 값을 특정 함수를 통해 다른 값으로 맵핑
+  *   2. merge()
+  *     - 여러개의 Observable을 하나의 Observable로 평탄화
+  *   3. mergeAll()
+  *     - 하나의 Observable에 있는 여러 Observable을 하나의 Observable로 평탄화
+  *   4. mergeMap()
+  *     - map() + mergeAll()
+  *   5. debounceTime()
+  *     - 설정한 시간 이후에 시간 동안 발생한 이벤트 중 마지막 이벤트를 발생
+  *   6. filter()
+  *     - 특정 조건의 데이터만 선별
+  *   7. distinctUntilChanged()
+  *     - 동일한 데이터가 계속 전달될 경우 이전과 다른 데이터가 전달되기 전까지 데이터를 전달하지 않음.
+  *   8. tab()
+  *     - 지정한 동작을 수행
+  *   9. partition()
+  *     - 조건이 참인경우와 거짓인 경우에 대해 Observable을 각각 분리하여 두개의 크기를 가진 배열로 반환한다.
+  *   10. switchAll()
+  *     - mergeAll와 같이 Observable 안에 있는 여러개의 Observable을 꺼내서 하나의 Observable 형태로 만든다.
+  *     - 차이점은 mergeAll이 내부 Observable을 합쳐 평탄화하는 반면 switchAll은 내부 Observable을 구독 해제하고 새로운 Observable을 구독하여 평탄화 하는 것
+  *   11. switchMap()
+  *     - map() + switchAll()
+  *     - 빈번하게 발생하는 데이터를 처리하는 경우 mergeMap 보다는 switchMap을 사용하는것이 효과적 (불필요한 데이터를 부르지 않는다.)
+  *     - 또한 이미 처리된 Observable을 자동으로 구독 해제하기 때문에 메모리 누수 문제에서도 자유롭다. (가급적 swithMap()을 사용하는 것이 좋다.)
+  *   12. catchError()
+  *     - 에러가 발생하면 Observer.Error를 호출하지 않고 발생한 에러와 현재 Observable을 파라미터로 전달
+  *     - 에러가 발생할 경우 자동으로 구독 해제가 된다. 구독 중지하지 않고 다른 작업을 할 때 사용
+  *   13. retry()
+  *     - 재시도, 첫번째 인자로 몇 번 더 시도할 것인지를 지정할 수 있다. 재시도 이후에도 계속해서 실패하면 Observer.Error가 호출된다.
+  *     - 인자를 넣지 않으면 계속해서 시도한다. 즉 구동 중지하지 않고 계속해서 시도
+  *   14. finalize()
+  *     - Observable이 종료될 때 종료시에 처리할 작업을 한다. (정상, 에러)
+  *
+  *
+  * */
+
+  /*
+  // 한 덩어리의 Observable
+  const search = fromEvent(document.getElementById('search'), 'keyup')
+    .pipe(
+      debounceTime(300), // 300ms 뒤 데이터 전달
+      map(event => event.target.value),
+      distinctUntilChanged(), // 값이 변하지 않고 이벤트가 발생한 경우 수행할 필요가 없으므로 전달 X
+      filter(query => query.trim().length > 0),
+      tap(() => console.log("요청 시작")),
+      //map(query => ajax.getJSON(`https://api.github.com/search/users?q=${query}`)),  // getJSON은 Observable을 반환한다.
+      //mergeAll()
+      mergeMap(query => ajax.getJSON(`https://api.github.com/search/users?q=${query}`)),
+      tap(() => console.log("요청 끝"))
+    )*/
+
+  const subject = new Subject();
+
+
+  // 하나의 덩어리 Observable을 keyup, user로 책임에 따라 분리
+  const search = fromEvent(document.getElementById('search'), 'keyup')
+    .pipe(
+      tap(() => console.log("from search")),
+      debounceTime(200), // 300ms 뒤 데이터 전달
+      map(event => event.target.value),
+      distinctUntilChanged(), // 값이 변하지 않고 이벤트가 발생한 경우 수행할 필요가 없으므로 전달 X
+      //multicast(new Subject)  // subject 대신 ConnectableObservable로
+      //publish(),              // multicast(new Subject)에서 매번 subject를 생성하지 않고 공유할 수 있도록
+      //refCount()              // ConnectableObservable의 구독 시작, 중지 작업 자동화
+      share()                   // publish() + refCount()
+    )
+
+  let [user, reset] = search  // 데이터가 user, reset에게 전달 된다. 둘 중 하나에게만 가면 되는데 둘다 가는 것은 낭비
+    .pipe(
+      partition(query => query.trim().length > 0)   // 하나의 조건을 기준으로 참과 거짓으로 분리
+    )
+
+
+  /*
+  * 주의점.
+  *   subject는 외부에서 단독으로 사용하지 않기를 권고한다. (사이드 이펙트 발생 가능성 증가)
+  *   Rxjs에서는 이를 보다 효율적으로 제어하기 위해 ConnectableObservable을 제공한다.
+  *
+  * */
+ /* let [user, reset] = subject // 위 데이터가 user, reset에게 전달되는 문제를 subject로 해결
+    .pipe(
+      partition(query => query.trim().length > 0)   // 하나의 조건을 기준으로 참과 거짓으로 분리
+    )*/
+
+  user = user
+    .pipe(
+      tap(() => console.log("from user")),
+      tap(() => console.log("요청 시작")),
+      //map(query => ajax.getJSON(`https://api.github.com/search/users?q=${query}`)),  // getJSON은 Observable을 반환한다.
+      //mergeAll()
+      switchMap(query => ajax.getJSON(`https://api.github.com/search/users?q=${query}`)),
+      tap(() => console.log("요청 끝")),
+      /*
+      catchError((e, orgObservable) => {
+        console.log("서버 에러가 발생하였으나 다시 호출", e.message)
+        return orgObservable
+      })
+       */
+      retry(3),
+      finalize(() => console.log("끝 끝"))
+    )
+
+  reset = reset
+    .pipe(
+      tap(() => console.log("from reset")),
+      tap(() => layer.innerHTML = '<p>검색어를 입력하세요</p>')
+    )
+
+  user.subscribe({
+    next : value => {
+      drawLayer(value.items)
+    },
+    error : e => {
+      alert(e.toString())
+    }
+  })
+
+  reset.subscribe()
+
+  // ConnectableObservable이기 때문에 connect() 호출
+  // search.connect()
+
+</script>
+</body>
+</html>

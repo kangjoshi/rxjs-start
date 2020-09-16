@@ -1,29 +1,21 @@
 <template>
   <div id="app">
-    <button @click="btnClicked">Button1</button>
-    <button>Button2</button>
+    <autocomplete></autocomplete>
   </div>
 </template>
 
 <script>
-import {Observable, fromEvent} from "rxjs";
-
-const click$ = fromEvent(document, "click")
-
-const observer = event => {
-  console.log(event.currentTarget)
-}
-click$.subscribe(observer);
+import Autocomplete from "./component/autocomplete/index";
 
 export default {
   name: 'app',
+  components: {Autocomplete},
   methods : {
     btnClicked(e) {
       console.log(e.currentTarget);
     }
   }
 }
-
 </script>
 
 <style>

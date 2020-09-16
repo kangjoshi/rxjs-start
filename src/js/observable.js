@@ -10,6 +10,31 @@ const {Observable, of, range, fromEvent, from, interval, empty} = pkg;
 *     - next() : 데이터 전달
 *     - error() : 에러가 발생 했을 경우
 *     - complete() : 데이터 전달이 완료 되었으면
+*
+*  Observable의 특징
+*   - 모든 데이터는 Observable 인스턴스로 만들 수 있다.
+*   - Observable은 읽기 전용이다.
+*   - Observable은 리액티브하다.
+*   - Observable은 불변객체이다.
+*
+*
+*  Cold Observable과 Hot Observable
+*   Cold Observable
+*     - 데이터 주체 생성이 내부에서 된다. 데이터 영역이 Observer마다 독립적이다.
+*     - Observer와의 관계 1:1
+*     - Observable
+*
+*
+*   Hot Observable
+*     - 데이터 주체 생성이 외부에서 된다. N개의 Observer와 공유한다.
+*     - Observer와의 관계 1:N
+*     - fromEvent(외부 Dom으로 부터 데이터가 생성되어 오는)에 의해 생성된 Observable, ConnectableObservable, Subject
+*
+*
+*
+*
+*
+*
 * */
 const numbers = new Observable(function subscribe(observer) {
 
